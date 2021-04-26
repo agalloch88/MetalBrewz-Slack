@@ -5,11 +5,36 @@ import ChatInput from './ChatInput';
 import ChatMessage from './ChatMessage';
 import db from '../firebase';
 import { useParams } from 'react-router-dom';
+import firebase from '../firebase';
 
-function Chat() {
+function Chat({ user }) {
 
     let { channelId } = useParams();
     const [ channel, setChannel ] = useState();
+    const [ messages, setMessages ] = useState();
+
+    const getMessages = () => {
+        db.collection('rooms')
+        .doc(channelId)
+        .collection('messages')
+        .orderBy('timestamp', 'asc')
+        .onSnapshot((snapshot) => {
+            let messages = snapshot.docs.map((doc) => doc.data());
+            setMessages(messages);
+        })
+    }
+
+    const sendMessage = (text) => {
+        if (channelId) {
+            let payload = {
+                text: text,
+                timestamp: firebase.firestore.Timestamp.now(),
+                user: user.name,
+                userImage: user.photo
+            }
+            db.collection('rooms').doc(channelId).collection('messages').add(payload);
+        }
+    }
 
     const getChannel = () => {
         db.collection('rooms')
@@ -21,6 +46,7 @@ function Chat() {
 
     useEffect(() => {
         getChannel();
+        getMessages();
     }, [channelId])
 
     return (
@@ -42,9 +68,19 @@ function Chat() {
                 </ChannelDetails>
             </Header>
             <MessageContainer>
-                <ChatMessage />
+                {
+                    messages.length > 0 &&
+                    messages.map((data, index) => (
+                        <ChatMessage
+                            text={data.text}
+                            name={data.user}
+                            image={data.userImage}
+                            timestamp={data.timestamp}
+                        />
+                    ))
+                }
             </MessageContainer>
-            <ChatInput />
+            <ChatInput sendMessage={sendMessage}/>
         </Container>
     )
 }
